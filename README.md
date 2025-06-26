@@ -11,8 +11,6 @@
 - **監控與錯誤追蹤**：整合 Prometheus/Grafana 監控 API 效能，Sentry 捕捉運行時錯誤。
 - **容器化部署**：使用 Docker 實現一致的開發與生產環境。
 
-> **GitHub 倉庫**：https://github.com/BpsEason/gym-system.git
-
 ## 系統架構
 
 以下是系統架構的 Mermaid 流程圖，展示主要組件和資料流：
