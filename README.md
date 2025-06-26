@@ -1034,10 +1034,3 @@ docker compose exec laravel.test php artisan test
 4. 推送到分支（`git push origin feature/YourFeature`）。
 5. 提交 Pull Request。
 
-## 授權
-
-本專案採用 MIT 授權。詳見 `LICENSE` 文件。
-
-## 聯繫方式
-
-如有問題，請聯繫 [bps.eason@example.com] 或在 GitHub 提交 Issue。
