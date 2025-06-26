@@ -11,6 +11,8 @@
 - **監控與錯誤追蹤**：整合 Prometheus/Grafana 監控 API 效能，Sentry 捕捉運行時錯誤。
 - **容器化部署**：使用 Docker 實現一致的開發與生產環境。
 
+> **GitHub 倉庫**：https://github.com/BpsEason/gym-system.git
+
 ## 系統架構
 
 以下是系統架構的 Mermaid 流程圖，展示主要組件和資料流：
@@ -78,7 +80,7 @@ graph TD
 
 ## 關鍵代碼展示
 
-以下是核心模組的代表性程式碼片段，展示設計決策與實現細節。
+以下是核心模組的代表性程式碼片段，包含詳細註解，展示功能實現與設計決策。
 
 ### 1. 會員等級升降邏輯（`app/Modules/Membership/Services/TierUpgradeService.php`）
 
@@ -92,35 +94,46 @@ use Illuminate\Support\Facades\Log;
 
 class TierUpgradeService
 {
+    /**
+     * 檢查會員積分並升降等級
+     * @param Member $member 會員模型實例
+     * @return void
+     */
     public function checkAndUpgradeTier(Member $member): void
     {
-        $points = $member->points;
-        $currentTier = $member->tier;
-        $newTier = $this->determineTier($points);
+        $points = $member->points; // 獲取會員當前積分
+        $currentTier = $member->tier; // 獲取會員當前等級
+        $newTier = $this->determineTier($points); // 根據積分計算新等級
 
+        // 若新等級與當前等級不同，則更新會員等級並記錄日誌
         if ($newTier !== $currentTier) {
             $member->update(['tier' => $newTier]);
             Log::info("Member {$member->id} tier upgraded from {$currentTier} to {$newTier}");
         }
     }
 
+    /**
+     * 根據積分確定會員等級
+     * @param int $points 會員積分
+     * @return string 新等級名稱
+     */
     private function determineTier(int $points): string
     {
-        $tiers = config('points.tiers');
+        $tiers = config('points.tiers'); // 從配置檔案獲取等級閾值
         foreach ($tiers as $tier => $threshold) {
             if ($points >= $threshold) {
-                return $tier;
+                return $tier; // 返回符合條件的最高等級
             }
         }
-        return 'Bronze';
+        return 'Bronze'; // 默認最低等級
     }
 }
 ```
 
 **設計說明**：
-- 使用配置檔案（`config/points.php`）定義等級閾值，易於調整。
-- 透過日誌記錄等級變化，方便追蹤和除錯。
-- 採用依賴注入（`Member` 模型），提高程式碼可測試性。
+- **配置驅動**：使用 `config/points.php` 定義等級閾值，方便動態調整。
+- **日誌記錄**：透過 `Log::info` 記錄等級變化，利於追蹤和除錯。
+- **依賴注入**：注入 `Member` 模型，提升可測試性並遵循 SOLID 原則。
 
 ### 2. 課程預約處理（`app/Modules/Course/Http/Controllers/CourseBookingController.php`）
 
@@ -138,20 +151,31 @@ class CourseBookingController extends Controller
 {
     protected $bookingService;
 
+    /**
+     * 建構函數，注入預約服務
+     * @param BookingService $bookingService 課程預約服務
+     */
     public function __construct(BookingService $bookingService)
     {
         $this->bookingService = $bookingService;
     }
 
+    /**
+     * 處理課程預約請求
+     * @param CourseSchedule $schedule 課程排程模型
+     * @return JsonResponse 預約結果
+     */
     public function book(CourseSchedule $schedule): JsonResponse
     {
+        // 檢查課程是否已滿
         if ($schedule->isFull()) {
             return response()->json(['message' => 'Course is full'], 400);
         }
 
-        $user = Auth::user();
-        $result = $this->bookingService->book($user, $schedule);
+        $user = Auth::user(); // 獲取當前認證用戶
+        $result = $this->bookingService->book($user, $schedule); // 執行預約邏輯
 
+        // 返回標準化的 JSON 響應
         return response()->json([
             'message' => $result ? 'Booking successful' : 'Booking failed',
             'data' => $result ? $schedule : null
@@ -161,9 +185,9 @@ class CourseBookingController extends Controller
 ```
 
 **設計說明**：
-- 使用 `BookingService` 封裝預約邏輯，降低控制器複雜度。
-- 檢查課程容量（`isFull`），搭配 Redis 鎖機制防止超賣。
-- 返回標準化的 JSON 響應，符合 RESTful API 規範。
+- **服務層分離**：使用 `BookingService` 封裝預約邏輯，降低控制器複雜度，符合單一職責原則。
+- **高併發處理**：透過 `isFull` 方法和 Redis 鎖（在 `BookingService` 中實現）防止超賣。
+- **RESTful 規範**：返回標準化的 JSON 響應，包含狀態碼和訊息，易於前端處理。
 
 ### 3. 前端課程日曆（`resources/js/pages/CourseCalendar.vue`）
 
@@ -184,17 +208,19 @@ import axios from 'axios';
 export default {
   components: { FullCalendar },
   setup() {
+    // 定義日曆配置，包含插件和事件數據
     const calendarOptions = ref({
-      plugins: [dayGridPlugin, timeGridPlugin],
-      initialView: 'dayGridMonth',
+      plugins: [dayGridPlugin, timeGridPlugin], // 月視圖和時間視圖插件
+      initialView: 'dayGridMonth', // 默認顯示月視圖
       events: async (fetchInfo, successCallback) => {
+        // 透過 API 獲取課程排程數據
         const response = await axios.get('/api/course/schedules', {
           params: {
-            start: fetchInfo.startStr,
-            end: fetchInfo.endStr
+            start: fetchInfo.startStr, // 開始日期
+            end: fetchInfo.endStr // 結束日期
           }
         });
-        successCallback(response.data);
+        successCallback(response.data); // 將數據傳遞給 FullCalendar
       }
     });
 
@@ -205,9 +231,9 @@ export default {
 ```
 
 **設計說明**：
-- 使用 FullCalendar 動態載入課程排程，透過 API 獲取資料。
-- 支援日期範圍篩選，提升使用者體驗。
-- 搭配 Tailwind CSS 實現響應式設計。
+- **動態數據載入**：使用 `axios` 從 `/api/course/schedules` 獲取課程排程，支援日期範圍篩選。
+- **響應式設計**：搭配 Tailwind CSS（在 `resources/css/app.css` 中配置），確保日曆在多設備上顯示一致。
+- **模組化組件**：採用 Vue 3 的 Composition API，提升程式碼可讀性和可維護性。
 
 ## 環境要求
 
@@ -284,7 +310,7 @@ export default {
        }
    }
    ```
-   然後運行：
+   運行：
    ```bash
    composer update
    ```
@@ -335,7 +361,7 @@ export default {
        ports:
          - "3000:3000"
    ```
-   保存為 `docker-compose.yml`，然後運行：
+   保存為 `docker-compose.yml`，運行：
    ```bash
    docker compose up -d
    ```
