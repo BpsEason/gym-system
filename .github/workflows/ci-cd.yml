@@ -1,0 +1,76 @@
+name: Laravel CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main # 當程式碼推送到 main 分支時觸發
+      - develop # 當程式碼推送到 develop 分支時觸發
+  pull_request:
+    branches:
+      - main
+      - develop # 當有拉取請求到 main 或 develop 分支時觸發
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest # 使用最新的 Ubuntu 執行環境
+
+    steps:
+    - name: 檢出程式碼 # 步驟1: 獲取最新的程式碼
+      uses: actions/checkout@v4
+
+    - name: 設置 .env 檔案 # 步驟2: 為測試環境準備 .env
+      run: cp .env.example .env
+
+    - name: 設定權限 # 針對 Docker 環境的資料夾權限設定
+      run: chmod -R 777 storage bootstrap/cache
+
+    - name: 啟動 Docker 服務 # 步驟3: 透過 Docker Compose 啟動應用程式服務 (MySQL, Redis, PHP-FPM)
+      run: docker compose up -d
+
+    - name: 等待資料庫服務啟動 # 確保 MySQL 完全啟動
+      run: |
+        echo "等待 MySQL 啟動..."
+        for i in `seq 1 10`; do
+          docker compose exec mysql mysqladmin ping -h localhost --silent && break
+          sleep 5
+        done
+        echo "MySQL 服務已啟動。"
+
+    - name: 安裝 Composer 依賴 # 步驟4: 在 laravel.test 容器內安裝 PHP 依賴
+      run: docker compose exec laravel.test composer install --no-interaction --prefer-dist --optimize-autoloader
+
+    - name: 生成應用程式金鑰 # 步驟5: 生成 Laravel APP_KEY
+      run: docker compose exec laravel.test php artisan key:generate
+
+    - name: 執行資料庫遷移和填充 # 步驟6: 執行資料庫遷移並填充測試數據
+      # 使用 --force 避免在非互動模式下提示
+      run: docker compose exec laravel.test php artisan migrate --seed --force
+
+    - name: 運行 PHPUnit/Pest 測試 # 步驟7: 執行測試
+      run: docker compose exec laravel.test php artisan test
+
+    - name: 構建 Docker 映像 # 步驟8: 構建應用程式的 Docker 映像
+      run: docker compose build
+
+    # 您可以在此處添加更多步驟，例如：
+    # - name: 推送 Docker 映像到 Docker Hub (僅限 main 分支)
+    #   if: github.ref == 'refs/heads/main'
+    #   run: |
+    #     echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+    #     docker compose push
+
+    # - name: 部署到伺服器 (僅限 main 分支)
+    #   if: github.ref == 'refs/heads/main'
+    #   uses: appleboy/ssh-action@master
+    #   with:
+    #     host: ${{ secrets.SSH_HOST }}
+    #     username: ${{ secrets.SSH_USERNAME }}
+    #     key: ${{ secrets.SSH_KEY }}
+    #     script: |
+    #       cd /path/to/your/app
+    #       git pull origin main
+    #       docker compose pull
+    #       docker compose up -d --build
+    #       docker compose exec laravel.test php artisan migrate --force
+    #       docker compose exec laravel.test php artisan optimize:clear
+    #       # Other deployment commands...
