@@ -4,8 +4,6 @@
 
 健身房管理系統是一個結合 Laravel 後端 API 和 Vue.js 單頁應用（SPA）的解決方案，旨在提供高效的健身房管理功能。本專案僅包含核心程式碼（模組化業務邏輯和前端資源），需整合至全新安裝的 Laravel 框架。系統支援會員管理（等級與積分）、教練管理（資料與薪資計算）、課程管理（排程、預約與候補名單），並整合 Google Calendar、Sentry 錯誤追蹤和 Prometheus/Grafana 監控。
 
-> **GitHub 倉庫**：https://github.com/BpsEason/gym-system.git
-
 以下以問答形式詳細介紹專案的技術實現、設計決策和未來擴展計劃，面向開發者展示技術亮點。
 
 ## 系統架構
